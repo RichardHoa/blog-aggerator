@@ -5,11 +5,12 @@ import (
 	"github.com/RichardHoa/blog-aggerator/internal/config"
 	"github.com/RichardHoa/blog-aggerator/internal/database"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"time"
 )
+
+type AuthedHandler func(http.ResponseWriter, *http.Request, database.User)
 
 func HandleHealthz(w http.ResponseWriter, r *http.Request) {
 
@@ -62,33 +63,57 @@ func CreateUser(apiCfg *config.ApiConfig) http.HandlerFunc {
 	}
 }
 
-func GetUserThroughAPIKey(apiCfg *config.ApiConfig) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			RespondWithError(w, http.StatusBadRequest, "Authorization header is missing")
+func GetUserThroughAPIKey() AuthedHandler {
+	return func(w http.ResponseWriter, r *http.Request, user database.User) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
+	}
+}
+
+func CreateFeed(apiCfg *config.ApiConfig) AuthedHandler {
+
+	return func(w http.ResponseWriter, r *http.Request, user database.User) {
+		userID := user.ID
+
+		// Get the request body
+		var feedData map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&feedData); err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid request body, it should be in json")
 			return
 		}
 
-		// Assuming the format is "ApiKey <key>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "ApiKey" {
-			RespondWithError(w, http.StatusBadRequest, "Invalid Authorization header format")
+		// Extract the feed data
+		name, ok := feedData["name"]
+		if !ok || name == "" {
+			RespondWithError(w, http.StatusBadRequest, "name field is required")
 			return
 		}
 
-		apiKey := parts[1]
+		url, ok := feedData["url"]
+		if !ok || url == "" {
+			RespondWithError(w, http.StatusBadRequest, "url field is required")
+			return
+		}
 
 		ctx := r.Context()
 
-		user, err := apiCfg.DB.GetUserByApiKey(ctx, apiKey)
+		feed, err := apiCfg.DB.CreateFeed(ctx, database.CreateFeedParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Name:      name,
+			Url:       url,
+			UserID:    userID,
+		})
 		if err != nil {
-			errStr := err.Error()
-			RespondWithError(w, http.StatusInternalServerError, "Failed to get user: "+errStr)
+			errString := err.Error()
+			RespondWithError(w, http.StatusInternalServerError, "Failed to create feed: " + errString)
 			return
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(user)
+		json.NewEncoder(w).Encode(feed)
+
 	}
+
 }
