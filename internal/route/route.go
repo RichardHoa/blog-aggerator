@@ -14,4 +14,6 @@ func ConfigureRoutes(mux *http.ServeMux, apiCfg *config.ApiConfig) {
 	mux.HandleFunc("GET /v1/err", handlers.HandleReturnError)
 
 	mux.HandleFunc("POST /v1/user", handlers.CreateUser(apiCfg))
+
+	mux.HandleFunc("GET /v1/user", handlers.GetUserThroughAPIKey(apiCfg))
 }
