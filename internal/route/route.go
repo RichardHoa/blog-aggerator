@@ -19,4 +19,6 @@ func ConfigureRoutes(mux *http.ServeMux, apiCfg *config.ApiConfig) {
 	mux.HandleFunc("GET /v1/user", middleware.MiddlewareAuth(apiCfg, handlers.GetUserThroughAPIKey()))
 
 	mux.HandleFunc("POST /v1/feed", middleware.MiddlewareAuth(apiCfg, handlers.CreateFeed(apiCfg)))
+
+	mux.HandleFunc("GET /v1/feeds", handlers.GetFeeds(apiCfg))
 }

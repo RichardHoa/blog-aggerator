@@ -117,3 +117,17 @@ func CreateFeed(apiCfg *config.ApiConfig) AuthedHandler {
 	}
 
 }
+
+func GetFeeds(apiCfg *config.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		feeds, err := apiCfg.DB.GetFeeds(ctx)
+		if err != nil {
+			errString := err.Error()
+			RespondWithError(w, http.StatusInternalServerError, "Failed to get feeds: " + errString)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(feeds)
+	}
+}
