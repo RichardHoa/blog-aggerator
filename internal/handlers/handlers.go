@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/RichardHoa/blog-aggerator/internal/config"
 	"github.com/RichardHoa/blog-aggerator/internal/database"
-	"net/http"
-
 	"github.com/google/uuid"
+	"net/http"
+	"strings"
 	"time"
 )
 
@@ -105,15 +106,28 @@ func CreateFeed(apiCfg *config.ApiConfig) AuthedHandler {
 			Url:       url,
 			UserID:    userID,
 		})
+
+		feedFollow, err := apiCfg.DB.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			FeedID:    feed.ID,
+			UserID:    userID,
+		})
+
 		if err != nil {
 			errString := err.Error()
-			RespondWithError(w, http.StatusInternalServerError, "Failed to create feed: " + errString)
+			RespondWithError(w, http.StatusInternalServerError, "Failed to create feed: "+errString)
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(feed)
+		var data = map[string]interface{}{
+			"feed":        feed,
+			"feed_follow": feedFollow,
+		}
 
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(data)
 	}
 
 }
@@ -124,10 +138,94 @@ func GetFeeds(apiCfg *config.ApiConfig) http.HandlerFunc {
 		feeds, err := apiCfg.DB.GetFeeds(ctx)
 		if err != nil {
 			errString := err.Error()
-			RespondWithError(w, http.StatusInternalServerError, "Failed to get feeds: " + errString)
+			RespondWithError(w, http.StatusInternalServerError, "Failed to get feeds: "+errString)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(feeds)
+	}
+}
+
+func CreateFeedFollow(apiCfg *config.ApiConfig) AuthedHandler {
+	return func(w http.ResponseWriter, r *http.Request, user database.User) {
+
+		var feedData map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&feedData); err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid request body, it should be in json")
+			return
+		}
+
+		feedID, ok := feedData["feed_id"]
+		if !ok || feedID == "" {
+			RespondWithError(w, http.StatusBadRequest, "feed_id field is required")
+			return
+		}
+
+		feedUUID, err := uuid.Parse(feedID)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid feed_id format")
+			return
+		}
+
+		ctx := r.Context()
+		feedFollow, err := apiCfg.DB.CreateFeedFollow(ctx, database.CreateFeedFollowParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			FeedID:    feedUUID,
+			UserID:    user.ID,
+		})
+		if err != nil {
+			errString := err.Error()
+			RespondWithError(w, http.StatusInternalServerError, "Failed to create feed follow: "+errString)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(feedFollow)
+
+	}
+}
+
+func DeleteFeedFollow(apiCfg *config.ApiConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the feedFollowID from the URL parameters
+		urlPath := r.URL.Path
+		parts := strings.Split(urlPath, "/")
+		feedFollowID := parts[len(parts)-1]
+
+		// vars := mux.Vars(r)
+		// fmt.Printf("vars: %v\n", vars)
+		// feedFollowID := vars["feedFollowID"]
+		fmt.Printf("feedFollowID: %v\n", feedFollowID)
+
+		feedFollowIDUUID, err := uuid.Parse(feedFollowID)
+		if err != nil {
+			RespondWithError(w, http.StatusBadRequest, "Invalid feedFollowID format")
+			return
+		}
+
+		deleteErr := apiCfg.DB.DeleteFeedFollow(r.Context(), feedFollowIDUUID)
+		if err != nil {
+			errString := deleteErr.Error()
+			RespondWithError(w, http.StatusInternalServerError, "Failed to delete feed follow: "+errString)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+
+	}
+}
+
+
+func GetFeedFollows(apiCfg *config.ApiConfig) AuthedHandler {
+	return func(w http.ResponseWriter, r *http.Request, user database.User) {
+		ctx := r.Context()
+		feedFollows, err := apiCfg.DB.GetFeedFollows(ctx, user.ID)
+		if err != nil {
+			errString := err.Error()
+			RespondWithError(w, http.StatusInternalServerError, "Failed to get feed follows: "+errString)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(feedFollows)
 	}
 }
