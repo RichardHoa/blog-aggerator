@@ -18,3 +18,8 @@ LIMIT $1;
 UPDATE feeds
 SET last_fetched = $1, updated_at = $2
 WHERE id = $3;
+
+
+-- name: GetFeedByUserID :many
+SELECT * FROM feeds
+WHERE user_id = $1;

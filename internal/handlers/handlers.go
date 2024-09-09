@@ -215,7 +215,6 @@ func DeleteFeedFollow(apiCfg *config.ApiConfig) http.HandlerFunc {
 	}
 }
 
-
 func GetFeedFollows(apiCfg *config.ApiConfig) AuthedHandler {
 	return func(w http.ResponseWriter, r *http.Request, user database.User) {
 		ctx := r.Context()
@@ -227,5 +226,36 @@ func GetFeedFollows(apiCfg *config.ApiConfig) AuthedHandler {
 		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(feedFollows)
+	}
+}
+
+func GetPosts(apiCfg *config.ApiConfig) AuthedHandler {
+	return func(w http.ResponseWriter, r *http.Request, user database.User) {
+		ctx := r.Context()
+		var allPosts []database.Post
+		feeds, err := apiCfg.DB.GetFeedByUserID(ctx, user.ID)
+		if err != nil {
+			errString := err.Error()
+			RespondWithError(w, http.StatusInternalServerError, "Failed to get feeds: "+errString)
+			return
+		}
+		for _, feed := range feeds {
+
+			posts, err := apiCfg.DB.GetPosts(ctx, database.GetPostsParams{
+				FeedID: feed.ID,
+				Limit:  10000})
+
+			if err != nil {
+				errString := err.Error()
+				RespondWithError(w, http.StatusInternalServerError, "Failed to get posts: "+errString)
+				return
+			}
+			allPosts = append(allPosts, posts...)
+		}
+		// Respond with all posts
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(allPosts); err != nil {
+			RespondWithError(w, http.StatusInternalServerError, "Failed to encode posts: "+err.Error())
+		}
 	}
 }

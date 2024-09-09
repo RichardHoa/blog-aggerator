@@ -1,17 +1,17 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/xml"
+	"github.com/RichardHoa/blog-aggerator/internal/config"
+	"github.com/RichardHoa/blog-aggerator/internal/database"
+	"github.com/google/uuid"
 	"io"
 	"log"
 	"net/http"
 	"sync"
 	"time"
-
-	"context"
-	"github.com/RichardHoa/blog-aggerator/internal/config"
-	"github.com/RichardHoa/blog-aggerator/internal/database"
 )
 
 // RSSFeed represents the structure of an RSS feed
@@ -108,10 +108,42 @@ func feedWorker(stop chan struct{}, fetchInterval time.Duration, numFeeds int32,
 
 					log.Println("Feed marked as fetched")
 
-					// Items := RssFeed.Channel.Items
-					// for _, post := range Items {
-					// 	log.Println(post.Title)
-					// }
+					log.Println("Processing feed items...")
+					Items := RssFeed.Channel.Items
+					for _, post := range Items {
+						layout := "Mon, 02 Jan 2006 15:04:05 -0700"
+						// Parse pubDate string to time.Time
+						var pubDate time.Time
+						var err error
+						if post.PubDate != "" {
+							pubDate, err = time.Parse(layout, post.PubDate) 
+							if err != nil {
+								pubDate = time.Time{} 
+							}
+						}
+
+						// Convert to NullTime
+						publishedAt := sql.NullTime{Time: pubDate, Valid: !pubDate.IsZero()}
+
+						// Handle description
+						var description sql.NullString
+						if post.Description != "" {
+							description = sql.NullString{String: post.Description, Valid: true}
+						} else {
+							description = sql.NullString{Valid: false}
+						}
+
+						apiConfig.DB.CreatePost(ctx, database.CreatePostParams{
+							ID:          uuid.New(),
+							CreatedAt:   time.Now(),
+							UpdatedAt:   time.Now(),
+							Title:       post.Title,
+							Url:         post.Link,
+							Description: description,
+							PublishedAt: publishedAt,
+							FeedID:      feed.ID,
+						})
+					}
 				}(feed)
 			}
 

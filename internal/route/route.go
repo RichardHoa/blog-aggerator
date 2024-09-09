@@ -27,4 +27,6 @@ func ConfigureRoutes(mux *http.ServeMux, apiCfg *config.ApiConfig) {
 	mux.HandleFunc("DELETE /v1/feed_follows/", handlers.DeleteFeedFollow(apiCfg))
 
 	mux.HandleFunc("GET /v1/feed_follows", middleware.MiddlewareAuth(apiCfg, handlers.GetFeedFollows(apiCfg)))
+
+	mux.HandleFunc("GET /v1/posts", middleware.MiddlewareAuth(apiCfg, handlers.GetPosts(apiCfg)))
 }
