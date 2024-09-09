@@ -3,12 +3,13 @@ package main
 import (
 	// "fmt"
 	"database/sql"
-	"github.com/RichardHoa/blog-aggerator/internal/route"
-	"github.com/RichardHoa/blog-aggerator/internal/database"
 	"github.com/RichardHoa/blog-aggerator/internal/config"
+	"github.com/RichardHoa/blog-aggerator/internal/database"
+	"github.com/RichardHoa/blog-aggerator/internal/route"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 
@@ -16,6 +17,12 @@ import (
 )
 
 func main() {
+
+	const (
+		fetchInterval = 60 * time.Second
+		numFeeds      = 10
+	)
+
 	// Load env variables
 	err := godotenv.Load()
 	if err != nil {
@@ -29,11 +36,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to the database: %v", err)
 	}
-	
+
 	// Create new db queries
 	dbQueries := database.New(db)
 
-	// Add db queries to api config 
+	// Add db queries to api config
 	apiCfg := &config.ApiConfig{
 		DB: dbQueries,
 	}
@@ -49,6 +56,9 @@ func main() {
 		Addr:    ":" + PORT,
 		Handler: mux,
 	}
+
+	stop := make(chan struct{})
+	go feedWorker(stop, fetchInterval, numFeeds, apiCfg)
 
 	// Run server
 	log.Printf("Serving files from %s on port: %s\n", ".", PORT)

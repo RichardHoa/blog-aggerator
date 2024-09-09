@@ -205,7 +205,7 @@ func DeleteFeedFollow(apiCfg *config.ApiConfig) http.HandlerFunc {
 		}
 
 		deleteErr := apiCfg.DB.DeleteFeedFollow(r.Context(), feedFollowIDUUID)
-		if err != nil {
+		if deleteErr != nil {
 			errString := deleteErr.Error()
 			RespondWithError(w, http.StatusInternalServerError, "Failed to delete feed follow: "+errString)
 			return
